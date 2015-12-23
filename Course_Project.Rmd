@@ -1,0 +1,114 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Jesse van den Berg"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Source
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+## Set libraries and work directory
+Here the neccesary packages are initialized. The workdirectory is also set properly.
+```{r, cache=TRUE, message=FALSE}
+# Intialize libraries
+library(caret)
+library(dplyr)
+library(RCurl)
+library(randomForest)
+library(e1071)
+
+# Set working directory
+setwd("C:/Users/Jesse/Documents/Coursera/Practical_Machine_Learning")
+
+# Enable parallel backend
+library(doParallel)
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+```
+
+## Download files
+Download the .csv files from the website and use the dplyr package to read them into a data frame.
+```{r, cache=TRUE, message=FALSE}
+# Define URL's
+trainingURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testingURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+# Load the files into dplyr data frames
+training <- tbl_df(read.csv(trainingURL, header=T, na.strings=c("NA","")))
+testing <- tbl_df(read.csv(testingURL, header=T, na.strings=c("NA","")))
+```
+
+## Exploratory data analysis
+In this chapter we will remove the first columns, that exist of timestamps, usernames or indices. Further, we remove the variables that exist mostly of NA's. They might be usefull for the model, but at first it is more convenient to run the model without them and see how accurate the model is. Lastly, we create a train and test set, in order to be able to test the model without overfitting to much. 
+```{r, cache=TRUE, message=FALSE}
+# Remove index, timestamp and user variables
+training <- training[,7:160]
+testing <- testing[,7:160]
+
+# Remove variables with mostly NA's
+mostlyData <- apply(!is.na(training),2,sum) > 19621
+training <- training[,mostlyData]
+testing <- testing[,mostlyData]
+
+# Create a training and testing dataset
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+training2 <- training[inTrain,]
+testing2 <- training[-inTrain,]
+```
+
+## Build the predictor model and set cross validation
+First, we will run a normal tree algorithm.
+```{r, cache=TRUE, message=FALSE}
+# Run a normal tree 
+treeModel <- train(classe ~ ., method="rpart", data=training2)
+```
+We can see that the accuracy of this model is not very good. Therefore, we will run a random forest model. This model can take long to load but is often very accurate. We use the caret package to run the randomforest algorithm, because we can include a preprocessing step for cross-validation. We set the mtry variable to 2, because we did a run with more tries, which didnt change the accuracy a bit. However, the algorithm runs much quicker with mtry = 2.
+```{r, cache=TRUE, message=FALSE}
+# Create preprocessing step for cross validation
+preProc <- trainControl(method="cv",number=5, allowParallel=TRUE)
+
+# Create the model by using the train function of the caret package
+rfModel <- train(classe ~ ., method="rf", tuneGrid=data.frame(mtry=2), trControl=preProc, prox=TRUE, data=training2)
+rfModel
+```
+The random forest model has an accuracy on the training2-set of `r rfModel$results$Accuracy`.
+
+## Prediction
+The accuracy on the training2-set is very high. To determine how accurate it is, we should use the model to predict the testing2 set and see how accurate it is. This is done by performing a prediction and making a confusion matrix.
+
+```{r}
+# Perform prediction
+predictRF <- predict(rfModel, testing2)
+
+# Get confusionmatrix
+confMatrix <- confusionMatrix(predictRF, testing2$classe)
+confMatrix
+```
+We can see that the model is even more accurate to predict the testing2 set, `r confMatrix$overall[1]`. This is good enough, so this will be the final model that we use for predicting the other sets.
+
+## Expected out of sample error
+The expected out of sample error is 1 - the accuracy, so this depends on the model. Ideally this should be as low as possible. With the current random forest model, the out of sample error is very low: `r 1 - confMatrix$overall[1]`.
+
+## Predict the 20 cases for the prediction assignment submission
+Since we have a model that predict for `r rfModel$results$Accuracy`, it is expected that the model will predict all the 20 test cases correctly. If this is not the case then we are very unlucky. Below, is the code that we used to make all the files, separately per case.
+```{r, cache=TRUE, message=FALSE}
+# Predict the answers
+answers <- predict(rfModel, testing)
+
+# Load the function
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+# Run the function to make the files
+setwd("C:/Users/Jesse/Documents/Coursera/Practical_Machine_Learning/Answers")
+pml_write_files(answers)
+```
+
+### Datasource
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.
