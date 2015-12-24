@@ -16,7 +16,6 @@ library(caret)
 library(dplyr)
 library(RCurl)
 library(randomForest)
-library(e1071)
 
 # Set working directory
 setwd("C:/Users/Jesse/Documents/Coursera/Practical_Machine_Learning")
@@ -62,6 +61,7 @@ First, we will run a normal tree algorithm.
 ```{r, cache=TRUE, message=FALSE}
 # Run a normal tree 
 treeModel <- train(classe ~ ., method="rpart", data=training2)
+treeModel
 ```
 We can see that the accuracy of this model is not very good. Therefore, we will run a random forest model. This model can take long to load but is often very accurate. We use the caret package to run the randomforest algorithm, because we can include a preprocessing step for cross-validation. We set the mtry variable to 2, because we did a run with more tries, which didnt change the accuracy a bit. However, the algorithm runs much quicker with mtry = 2.
 ```{r, cache=TRUE, message=FALSE}
@@ -74,24 +74,23 @@ rfModel
 ```
 The random forest model has an accuracy on the training2-set of `r rfModel$results$Accuracy`.
 
-## Prediction
-The accuracy on the training2-set is very high. To determine how accurate it is, we should use the model to predict the testing2 set and see how accurate it is. This is done by performing a prediction and making a confusion matrix.
-
-```{r}
+## Cross validation on test set
+The accuracy on the training2-set is very high. To determine how accurate it is, we should cross validate the model to predict the testing2 set and see how accurate it is. This is done by making a confusion matrix based on the prediction.
+```{r, cache=TRUE, message=FALSE}
 # Perform prediction
 predictRF <- predict(rfModel, testing2)
 
 # Get confusionmatrix
-confMatrix <- confusionMatrix(predictRF, testing2$classe)
+confMatrix <- caret::confusionMatrix(predictRF, testing2$classe)
 confMatrix
 ```
-We can see that the model is even more accurate to predict the testing2 set, `r confMatrix$overall[1]`. This is good enough, so this will be the final model that we use for predicting the other sets.
+We can see that the model is also very accurate to predict the testing2 set, `r confMatrix$overall[1]`. ThisWe expect that this is good enough to predict the 20 test cases. So this will be the final model that we use for predicting the other sets.
 
 ## Expected out of sample error
-The expected out of sample error is 1 - the accuracy, so this depends on the model. Ideally this should be as low as possible. With the current random forest model, the out of sample error is very low: `r 1 - confMatrix$overall[1]`.
+The expected out of sample error is 1 - the accuracy. This depends on the model that we build and should ideallybe as low as possible. With the current random forest model, the out of sample error is very low: `r 1 - confMatrix$overall[1]`. Since we have a model that predict for `r rfModel$results$Accuracy`, it is expected that the model will predict all the 20 test cases correctly. If this is not the case then we are very unlucky. 
 
 ## Predict the 20 cases for the prediction assignment submission
-Since we have a model that predict for `r rfModel$results$Accuracy`, it is expected that the model will predict all the 20 test cases correctly. If this is not the case then we are very unlucky. Below, is the code that we used to make all the files, separately per case.
+Below, is the code that we used to make all the files, separately per case.
 ```{r, cache=TRUE, message=FALSE}
 # Predict the answers
 answers <- predict(rfModel, testing)

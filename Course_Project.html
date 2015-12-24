@@ -10,7 +10,7 @@
 
 <meta name="author" content="Jesse van den Berg" />
 
-<meta name="date" content="2015-12-23" />
+<meta name="date" content="2015-12-24" />
 
 <title>Practical Machine Learning - Course Project</title>
 
@@ -64,7 +64,7 @@ img {
 <div id="header">
 <h1 class="title">Practical Machine Learning - Course Project</h1>
 <h4 class="author"><em>Jesse van den Berg</em></h4>
-<h4 class="date"><em>2015-12-23</em></h4>
+<h4 class="date"><em>2015-12-24</em></h4>
 </div>
 
 
@@ -80,9 +80,8 @@ library(caret)
 library(dplyr)
 library(RCurl)
 library(randomForest)
-library(e1071)</code></pre>
-<pre><code>## Warning: package 'e1071' was built under R version 3.2.3</code></pre>
-<pre class="r"><code># Set working directory
+
+# Set working directory
 setwd(&quot;C:/Users/Jesse/Documents/Coursera/Practical_Machine_Learning&quot;)
 
 # Enable parallel backend
@@ -120,9 +119,28 @@ testing2 &lt;- training[-inTrain,]</code></pre>
 </div>
 <div id="build-the-predictor-model-and-set-cross-validation" class="section level2">
 <h2>Build the predictor model and set cross validation</h2>
-<p>First, we will run a normal tree algorithm. To determine how accurate this model is.</p>
+<p>First, we will run a normal tree algorithm.</p>
 <pre class="r"><code># Run a normal tree 
-treeModel &lt;- train(classe ~ ., method=&quot;rpart&quot;, data=training2)</code></pre>
+treeModel &lt;- train(classe ~ ., method=&quot;rpart&quot;, data=training2)
+treeModel</code></pre>
+<pre><code>## CART 
+## 
+## 13737 samples
+##    53 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## No pre-processing
+## Resampling: Bootstrapped (25 reps) 
+## Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
+## Resampling results across tuning parameters:
+## 
+##   cp          Accuracy   Kappa       Accuracy SD  Kappa SD 
+##   0.03778863  0.5351099  0.40219005  0.03468861   0.0536915
+##   0.06089581  0.4172596  0.21058858  0.06423456   0.1075913
+##   0.11565456  0.3357388  0.07843797  0.03879213   0.0600878
+## 
+## Accuracy was used to select the optimal model using  the largest value.
+## The final value used for the model was cp = 0.03778863.</code></pre>
 <p>We can see that the accuracy of this model is not very good. Therefore, we will run a random forest model. This model can take long to load but is often very accurate. We use the caret package to run the randomforest algorithm, because we can include a preprocessing step for cross-validation. We set the mtry variable to 2, because we did a run with more tries, which didnt change the accuracy a bit. However, the algorithm runs much quicker with mtry = 2.</p>
 <pre class="r"><code># Create preprocessing step for cross validation
 preProc &lt;- trainControl(method=&quot;cv&quot;,number=5, allowParallel=TRUE)
@@ -148,14 +166,14 @@ rfModel</code></pre>
 ## </code></pre>
 <p>The random forest model has an accuracy on the training2-set of 0.9937393.</p>
 </div>
-<div id="prediction" class="section level2">
-<h2>Prediction</h2>
-<p>The accuracy on the training2-set is very high. To determine how accurate it is, we should use the model to predict the testing2 set and see how accurate it is. This is done by performing a prediction and making a confusion matrix.</p>
+<div id="cross-validation-on-test-set" class="section level2">
+<h2>Cross validation on test set</h2>
+<p>The accuracy on the training2-set is very high. To determine how accurate it is, we should cross validate the model to predict the testing2 set and see how accurate it is. This is done by making a confusion matrix based on the prediction.</p>
 <pre class="r"><code># Perform prediction
 predictRF &lt;- predict(rfModel, testing2)
 
 # Get confusionmatrix
-confMatrix &lt;- confusionMatrix(predictRF, testing2$classe)
+confMatrix &lt;- caret::confusionMatrix(predictRF, testing2$classe)
 confMatrix</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
@@ -188,14 +206,15 @@ confMatrix</code></pre>
 ## Detection Rate         0.2843   0.1929   0.1718   0.1609   0.1833
 ## Detection Prevalence   0.2846   0.1952   0.1750   0.1618   0.1833
 ## Balanced Accuracy      0.9995   0.9968   0.9907   0.9907   0.9986</code></pre>
-<p>We can see that the model is even more accurate to predict the testing2 set, 0.9932031. This is good enough, so this will be the final model that we use for predicting the other sets.</p>
+<p>We can see that the model is also very accurate to predict the testing2 set, 0.9932031. ThisWe expect that this is good enough to predict the 20 test cases. So this will be the final model that we use for predicting the other sets.</p>
 </div>
 <div id="expected-out-of-sample-error" class="section level2">
 <h2>Expected out of sample error</h2>
-<p>The expected out of sample error is 1 - the accuracy, so this depends on the model. Ideally this should be as low as possible. With the current random forest model, the out of sample error is very low: 0.0067969.</p>
+<p>The expected out of sample error is 1 - the accuracy. This depends on the model that we build and should ideallybe as low as possible. With the current random forest model, the out of sample error is very low: 0.0067969. Since we have a model that predict for 0.9937393, it is expected that the model will predict all the 20 test cases correctly. If this is not the case then we are very unlucky.</p>
 </div>
 <div id="predict-the-20-cases-for-the-prediction-assignment-submission" class="section level2">
 <h2>Predict the 20 cases for the prediction assignment submission</h2>
+<p>Below, is the code that we used to make all the files, separately per case.</p>
 <pre class="r"><code># Predict the answers
 answers &lt;- predict(rfModel, testing)
 
